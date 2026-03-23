@@ -1,0 +1,49 @@
+# Environment / secrets
+.env
+*.env
+.buyer-env
+.seller-env
+location-override.json
+
+
+# Data files
+log-fresh.txt
+*.log
+
+# Go build
+skytrace
+skytrace-linux
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/map/node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+replay
+server
+
+main-live.go.new
+main-half-4dsky.go.bak
+
+diagrams/
+
+.claude/
+frontend.md
