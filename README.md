@@ -4,7 +4,9 @@ A decentralized airspace surveillance system that locates aircraft using multila
 
 Built for the **Neuron 4DSky MLAT Challenge** hackathon.
 
-![SkyTrace Screenshot](https://img.shields.io/badge/status-live-cyan)
+![alt text](./frontend/public/skytrace-1.png)
+
+![alt text](./frontend/public/skytrace-2.png)
 
 ## What It Does
 
@@ -20,12 +22,7 @@ Built for the **Neuron 4DSky MLAT Challenge** hackathon.
 
 ## Architecture
 
-```
-Sensors (Cornwall, UK) → Neuron P2P → Decode ModeS → Correlate → MLAT Solve → Kalman Track
-                                                                          ↓            ↓
-                                                                    HCS Publish   WebSocket
-                                                                     (Hedera)     (Browser)
-```
+![alt text](./frontend/public/archi.png)
 
 ## Tech Stack
 
@@ -128,6 +125,8 @@ go run cmd/replay/main.go --log log.txt --overrides location-override.json
 | `GET /api/sensor-quality` | Per-sensor quality metrics |
 
 ## How MLAT Works
+
+![alt text](./frontend/public/mlat-works.png)
 
 Aircraft transmit radio signals that are received by multiple ground sensors at slightly different times (because radio travels at the speed of light, ~1 foot per nanosecond). By measuring the **Time Difference of Arrival (TDOA)** between sensor pairs and knowing the sensor positions, we solve a system of hyperbolic equations to find where the aircraft is.
 
