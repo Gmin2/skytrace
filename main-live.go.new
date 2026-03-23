@@ -1,0 +1,175 @@
+// main.go
+// SkyTrace: Decentralized MLAT on the Neuron Network.
+// Connects to live 4DSky sensors via Neuron P2P, decodes ModeS,
+// performs multilateration, and serves results via WebSocket.
+package main
+
+import (
+	"context"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"log"
+	"math"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	neuronsdk "github.com/NeuronInnovations/neuron-go-hedera-sdk"
+	commonlib "github.com/NeuronInnovations/neuron-go-hedera-sdk/common-lib"
+
+	"github.com/hashgraph/hedera-sdk-go/v2"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
+
+	"quickstart/pkg/modes"
+	"quickstart/pkg/pipeline"
+)
+
+const minFixedSize = 48 // 6 fields × 8 bytes each
+
+func readExact(s network.Stream, buf []byte) error {
+	var total int
+	for total < len(buf) {
+		n, err := s.Read(buf[total:])
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return io.EOF
+		}
+		total += n
+	}
+	return nil
+}
+
+func main() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
+	// Initialize the MLAT pipeline
+	p, err := pipeline.New("location-override.json")
+	if err != nil {
+		log.Fatalf("Failed to create pipeline: %v", err)
+	}
+
+	// Start HTTP/WebSocket server in background
+	go func() {
+		if err := p.StartServer(":8080"); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+	log.Println("WebSocket server started on :8080")
+
+	var NrnProtocol = protocol.ID("neuron/ADSB/0.0.2")
+
+	neuronsdk.LaunchSDK(
+		"0.1",
+		NrnProtocol,
+		nil,
+		// Buyer P2P handler: receives live sensor data
+		func(ctx context.Context, h host.Host, b *commonlib.NodeBuffers) {
+			h.SetStreamHandler(NrnProtocol, func(streamHandler network.Stream) {
+				defer streamHandler.Close()
+				peerID := streamHandler.Conn().RemotePeer()
+				b.SetStreamHandler(peerID, &streamHandler)
+
+				log.Printf("Stream established with peer %s", peerID)
+
+				for {
+					if network.Stream.Conn(streamHandler).IsClosed() {
+						log.Printf("Stream closed: %s", peerID)
+						break
+					}
+
+					streamHandler.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+					// Read 1-byte length prefix
+					lengthBuf := make([]byte, 1)
+					if err := readExact(streamHandler, lengthBuf); err != nil {
+						if err != io.EOF {
+							continue // timeout, retry
+						}
+						break
+					}
+
+					totalPacketSize := int(lengthBuf[0])
+					if totalPacketSize == 0 {
+						continue
+					}
+
+					// Read the full packet
+					packetBytes := make([]byte, totalPacketSize)
+					if err := readExact(streamHandler, packetBytes); err != nil {
+						if err != io.EOF {
+							log.Printf("Error reading packet: %v", err)
+						}
+						break
+					}
+
+					if len(packetBytes) < minFixedSize {
+						continue
+					}
+
+					// Parse binary packet into RawMessage
+					raw := parsePacket(packetBytes)
+					if raw == nil {
+						continue
+					}
+
+					// Feed into the MLAT pipeline
+					p.ProcessMessage(raw)
+				}
+			})
+		},
+		// Buyer topic callback
+		func(msg hedera.TopicMessage) {
+			// HCS messages handled by SDK
+		},
+		// Seller case (not used)
+		func(ctx context.Context, h host.Host, b *commonlib.NodeBuffers) {},
+		// Seller topic callback (not used)
+		func(msg hedera.TopicMessage) {},
+	)
+
+	// Wait for interrupt
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+	fmt.Println("Shutting down.")
+}
+
+func parsePacket(data []byte) *modes.RawMessage {
+	if len(data) < minFixedSize {
+		return nil
+	}
+
+	off := 0
+	msg := &modes.RawMessage{}
+
+	msg.SensorID = int64(binary.BigEndian.Uint64(data[off : off+8]))
+	off += 8
+
+	msg.SensorLat = math.Float64frombits(binary.BigEndian.Uint64(data[off : off+8]))
+	off += 8
+
+	msg.SensorLon = math.Float64frombits(binary.BigEndian.Uint64(data[off : off+8]))
+	off += 8
+
+	msg.SensorAlt = math.Float64frombits(binary.BigEndian.Uint64(data[off : off+8]))
+	off += 8
+
+	msg.SecSinceMid = binary.BigEndian.Uint64(data[off : off+8])
+	off += 8
+
+	msg.Nanoseconds = binary.BigEndian.Uint64(data[off : off+8])
+	off += 8
+
+	msg.Raw = make([]byte, len(data)-off)
+	copy(msg.Raw, data[off:])
+
+	return msg
+}
