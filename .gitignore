@@ -24,7 +24,6 @@ go.work
 # Frontend
 frontend/node_modules/
 frontend/dist/
-frontend/map/node_modules/
 
 # IDE
 .vscode/
@@ -37,10 +36,9 @@ frontend/map/node_modules/
 .DS_Store
 Thumbs.db
 
-replay
-server
+# replay
+# server
 
-main-live.go.new
 main-half-4dsky.go.bak
 
 diagrams/
