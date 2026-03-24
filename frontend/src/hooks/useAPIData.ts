@@ -12,7 +12,7 @@ export interface SensorQualityData {
 
 const API_BASE = import.meta.env.DEV
   ? ''
-  : `http://${import.meta.env.VITE_BACKEND_URL || '167.71.231.68:8080'}`
+  : `https://${import.meta.env.VITE_BACKEND_URL || 'api.skytraced.xyz'}`
 
 export function useAPIData() {
   const [accuracy, setAccuracy] = useState<AccuracyData | null>(null)
