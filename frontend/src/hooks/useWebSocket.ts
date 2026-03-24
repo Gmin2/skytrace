@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TrackData, SensorData, StatsData, WSMessage } from '../types'
 
+const BACKEND = import.meta.env.VITE_BACKEND_URL || '167.71.231.68:8080'
+
 const WS_URL = import.meta.env.DEV
   ? `ws://${window.location.hostname}:5173/ws`
-  : `ws://${window.location.host}/ws`
+  : `ws://${BACKEND}/ws`
 
 const RECONNECT_DELAY = 2000
 const TRACK_THROTTLE_MS = 3000
