@@ -10,6 +10,10 @@ export interface SensorQualityData {
   }
 }
 
+const API_BASE = import.meta.env.DEV
+  ? ''
+  : `http://${import.meta.env.VITE_BACKEND_URL || '167.71.231.68:8080'}`
+
 export function useAPIData() {
   const [accuracy, setAccuracy] = useState<AccuracyData | null>(null)
   const [sensorQuality, setSensorQuality] = useState<SensorQualityData | null>(null)
@@ -18,8 +22,8 @@ export function useAPIData() {
     const fetchData = async () => {
       try {
         const [accRes, sqRes] = await Promise.all([
-          fetch('/api/accuracy'),
-          fetch('/api/sensor-quality'),
+          fetch(`${API_BASE}/api/accuracy`),
+          fetch(`${API_BASE}/api/sensor-quality`),
         ])
         if (accRes.ok) setAccuracy(await accRes.json())
         if (sqRes.ok) setSensorQuality(await sqRes.json())
